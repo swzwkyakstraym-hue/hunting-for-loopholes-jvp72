@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta name="description" content="صيد الثغرات">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8C%90%3C/text%3E%3C/svg%3E">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BugHunter AI — صيد الثغرات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060910;
+    --bg2: #0d1117;
+    --bg3: #161b22;
+    --panel: #0d1117;
+    --border: #21262d;
+    --green: #39d353;
+    --cyan: #58a6ff;
+    --yellow: #e3b341;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --white: #e6edf3;
+    --muted: #7d8590;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-ar: 'IBM Plex Sans Arabic', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--white); font-family: var(--font-ar); }
+
+  /* SCANLINES EFFECT */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 4px);
+  }
+
+  .shell {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono);
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, #39d353 0%, #58a6ff 100%);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo-text span { color: var(--green); }
+  .badge {
+    font-family: var(--font-mono); font-size: 11px;
+    background: rgba(57,211,83,.12); color: var(--green);
+    border: 1px solid rgba(57,211,83,.3); border-radius: 20px;
+    padding: 3px 10px;
+  }
+
+  /* SCOPE INPUT */
+  .scope-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .scope-card h2 {
+    font-size: 14px; color: var(--muted); margin-bottom: 14px;
+    font-family: var(--font-mono); letter-spacing: .5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .scope-card h2::before { content: '//'; color: var(--green); }
+  .scope-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .scope-row input, .scope-row select {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 9px 13px;
+    outline: none;
+    transition: border-color .2s;
+    min-width: 0;
+  }
+  .scope-row input { flex: 1 1 200px; }
+  .scope-row select { flex: 0 0 160px; }
+  .scope-row input:focus, .scope-row select:focus { border-color: var(--cyan); }
+  .scope-row select option { background: var(--bg2); }
+  .btn {
+    background: var(--green);
+    color: #000;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 20px;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { opacity: .88; }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+  }
+  .btn-ghost:hover { background: rgba(88,166,255,.08); }
+
+  /* TOOLS GRID */
+  .section-title {
+    font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+    letter-spacing: 1px; text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .tool-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px 14px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    display: flex; align-items: flex-start; gap: 10px;
+    user-select: none;
+  }
+  .tool-card:hover { border-color: var(--cyan); background: #131920; }
+  .tool-card.selected { border-color: var(--green); background: rgba(57,211,83,.06); }
+  .tool-card.selected .tool-check { background: var(--green); border-color: var(--green); color: #000; }
+  .tool-check {
+    width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; transition: all .15s;
+    font-family: var(--font-mono);
+  }
+  .tool-info { flex: 1; min-width: 0; }
+  .tool-name { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--cyan); }
+  .tool-desc { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+  .tool-tag {
+    display: inline-block; font-family: var(--font-mono); font-size: 9px;
+    padding: 1px 6px; border-radius: 3px; margin-top: 5px;
+    background: rgba(57,211,83,.1); color: var(--green); border: 1px solid rgba(57,211,83,.2);
+  }
+  .tool-tag.recon { background: rgba(88,166,255,.1); color: var(--cyan); border-color: rgba(88,166,255,.2); }
+  .tool-tag.fuzz  { background: rgba(227,179,65,.1);  color: var(--yellow); border-color: rgba(227,179,65,.2); }
+  .tool-tag.scan  { background: rgba(188,140,255,.1); color: var(--purple); border-color: rgba(188,140,255,.2); }
+  .tool-tag.secret{ background: rgba(248,81,73,.1);  color: var(--red);   border-color: rgba(248,81,73,.2); }
+
+  /* PIPELINE VISUAL */
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    margin-bottom: 24px; overflow-x: auto; padding-bottom: 4px;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .pipe-step {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 14px;
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--muted); white-space: nowrap; flex-shrink: 0;
+    transition: all .2s;
+  }
+  .pipe-step.active { border-color: var(--green); color: var(--green); background: rgba(57,211,83,.07); }
+  .pipe-step.done   { border-color: var(--cyan);  color: var(--cyan);  background: rgba(88,166,255,.07); }
+  .pipe-arrow {
+    font-family: var(--font-mono); color: var(--border);
+    padding: 0 6px; flex-shrink: 0; font-size: 16px;
+  }
+  .pipe-arrow.active { color: var(--green); }
+
+  /* TERMINAL */
+  .terminal {
+    background: #020408;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    min-height: 120px;
+  }
+  .terminal-bar {
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-r { background: #f85149; } .dot-y { background: #e3b341; } .dot-g { background: #39d353; }
+  .terminal-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-right: auto; }
+  .copy-btn {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 8px; cursor: pointer; transition: all .15s;
+  }
+  .copy-btn:hover { color: var(--white); border-color: var(--muted); }
+  .terminal-body {
+    padding: 14px 16px;
+    font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7;
+    color: #c9d1d9;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 380px; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    direction: ltr;
+  }
+  .terminal-body .prompt { color: var(--green); }
+  .terminal-body .cmd    { color: var(--white); }
+  .terminal-body .out    { color: var(--muted); }
+  .terminal-body .ok     { color: var(--green); }
+  .terminal-body .info   { color: var(--cyan); }
+  .terminal-body .warn   { color: var(--yellow); }
+  .terminal-body .err    { color: var(--red); }
+  .terminal-body .hl     { color: var(--purple); }
+
+  /* AI OUTPUT */
+  .ai-panel {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .ai-header {
+    background: rgba(88,166,255,.06);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .ai-title { font-family: var(--font-mono); font-size: 12px; color: var(--cyan); }
+  .ai-body {
+    padding: 16px;
+    font-size: 13px; line-height: 1.8;
+    color: var(--white);
+    min-height: 80px;
+  }
+  .ai-body h3 {
+    font-family: var(--font-mono); font-size: 13px;
+    color: var(--green); margin: 14px 0 6px;
+    border-bottom: 1px solid rgba(57,211,83,.15); padding-bottom: 4px;
+  }
+  .ai-body ul { padding-right: 18px; color: var(--muted); }
+  .ai-body ul li { margin-bottom: 4px; }
+  .ai-body code {
+    background: rgba(88,166,255,.08); color: var(--cyan);
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 1px 5px; border-radius: 3px; direction: ltr; display: inline-block;
+  }
+  .ai-body strong { color: var(--yellow); }
+  .thinking {
+    display: flex; gap: 5px; align-items: center;
+    color: var(--muted); font-family: var(--font-mono); font-size: 12px; padding: 8px 0;
+  }
+  .thinking span { animation: blink 1s infinite; }
+  .thinking span:nth-child(2) { animation-delay: .2s; }
+  .thinking span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,100%{opacity:.2} 50%{opacity:1} }
+
+  /* VULN FINDINGS */
+  .findings { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .finding {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 13px;
+    font-size: 12px; border-right: 3px solid var(--border);
+  }
+  .finding.high   { border-right-color: var(--red); }
+  .finding.medium { border-right-color: var(--yellow); }
+  .finding.low    { border-right-color: var(--cyan); }
+  .finding-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .sev-badge {
+    font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+    padding: 1px 7px; border-radius: 3px;
+  }
+  .sev-high   { background: rgba(248,81,73,.15); color: var(--red); }
+  .sev-medium { background: rgba(227,179,65,.15); color: var(--yellow); }
+  .sev-low    { background: rgba(88,166,255,.15); color: var(--cyan); }
+  .finding-title { font-family: var(--font-mono); font-size: 12px; color: var(--white); }
+  .finding-desc  { color: var(--muted); line-height: 1.5; }
+  .finding-cmd   { font-family: var(--font-mono); font-size: 11px; color: var(--green); margin-top: 4px; direction: ltr; }
+
+  /* STATS ROW */
+  .stats { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; flex: 1 1 100px;
+    text-align: center;
+  }
+  .stat-num { font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--green); }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 2px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .tab {
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 8px 16px; cursor: pointer; color: var(--muted);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: all .15s;
+  }
+  .tab:hover { color: var(--white); }
+  .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎯</div>
+      <div>
+        <div class="logo-text">Bug<span>Hunter</span>.AI</div>
+        <div style="font-size:11px;color:var(--muted)">Automated Recon & Vuln Discovery</div>
+      </div>
+    </div>
+    <div class="badge">● LIVE</div>
+  </header>
+
+  <!-- SCOPE INPUT -->
+  <div class="scope-card">
+    <h2>تعريف السكوب / Target Scope</h2>
+    <div class="scope-row">
+      <input id="targetInput" type="text" placeholder="example.com or *.example.com" dir="ltr" />
+      <select id="programType">
+        <option value="web">Web App</option>
+        <option value="api">API / REST</option>
+        <option value="infra">Infrastructure</option>
+        <option value="mobile">Mobile Backend</option>
+      </select>
+      <button class="btn" id="startBtn" onclick="startHunt()">
+        <span>⚡</span> ابدأ الصيد
+      </button>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--muted)">
+      ⚠️ استخدم فقط على برامج مرخصة ومواقع في سكوب برنامج باق باونتي رسمي
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats" id="statsRow" style="display:none">
+    <div class="stat"><div class="stat-num" id="stat1">0</div><div class="stat-label">Subdomains</div></div>
+    <div class="stat"><div class="stat-num" id="stat2">0</div><div class="stat-label">Live Hosts</div></div>
+    <div class="stat"><div class="stat-num" id="stat3">0</div><div class="stat-label">Endpoints</div></div>
+    <div class="stat"><div class="stat-num" id="stat4" style="color:var(--red)">0</div><div class="stat-label">Findings</div></div>
+  </div>
+
+  <!-- PIPELINE -->
+  <div id="pipelineSection" style="display:none">
+    <div class="section-title">Recon Pipeline</div>
+    <div class="pipeline" id="pipeline">
+      <div class="pipe-step" id="p0">Subdomain Enum</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" id="p1">DNS Resolve</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" id="p2">HTTP Probe</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" id="p3">Port Scan</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" id="p4">Dir Fuzz</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" id="p5">JS Scan</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" id="p6">Nuclei</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" id="p7">Report</div>
+    </div>
+  </div>
+
+  <!-- TOOLS SECTION -->
+  <div class="section-title">الأدوات المتاحة — GitHub Tools</div>
+  <div class="tools-grid" id="toolsGrid">
+    <!-- filled by JS -->
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="selectAll()">تحديد الكل</button>
+    <button class="btn btn-ghost" onclick="clearAll()">إلغاء الكل</button>
+    <button class="btn" id="installBtn" onclick="generateInstall()" disabled>⬇ توليد أوامر التثبيت</button>
+    <button class="btn" id="analyzeBtn" onclick="runAIAnalysis()" disabled style="background:var(--cyan)">🤖 تحليل AI وخطة الاصطياد</button>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('install')">أوامر التثبيت</div>
+    <div class="tab" onclick="switchTab('workflow')">Workflow Pipeline</div>
+    <div class="tab" onclick="switchTab('aiplan')">خطة AI</div>
+    <div class="tab" onclick="switchTab('findings')">Findings 🔴</div>
+  </div>
+
+  <!-- INSTALL TAB -->
+  <div class="tab-content active" id="tab-install">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <div class="terminal-label">install.sh — bash</div>
+        <button class="copy-btn" onclick="copyTerminal('installTerm')">copy</button>
+      </div>
+      <div class="terminal-body" id="installTerm">
+<span class="out"># اختر الأدوات ثم اضغط "توليد أوامر التثبيت"</span>
+<span class="out"># Select tools then click "Generate Install Commands"</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKFLOW TAB -->
+  <div class="tab-content" id="tab-workflow">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <div class="terminal-label">workflow.sh — automated pipeline</div>
+        <button class="copy-btn" onclick="copyTerminal('workflowTerm')">copy</button>
+      </div>
+      <div class="terminal-body" id="workflowTerm">
+<span class="out"># أدخل السكوب واختر الأدوات أولاً</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI PLAN TAB -->
+  <div class="tab-content" id="tab-aiplan">
+    <div class="ai-panel">
+      <div class="ai-header">
+        <div class="ai-dot"></div>
+        <div class="ai-title">Claude AI — Bug Bounty Intelligence</div>
+      </div>
+      <div class="ai-body" id="aiOutput">
+        <span style="color:var(--muted);font-family:var(--font-mono);font-size:12px">
+          // أدخل السكوب واضغط "تحليل AI وخطة الاصطياد" للحصول على خطة مخصصة
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS TAB -->
+  <div class="tab-content" id="tab-findings">
+    <div class="ai-panel">
+      <div class="ai-header">
+        <div class="ai-dot" style="background:var(--red)"></div>
+        <div class="ai-title" style="color:var(--red)">Vulnerability Findings</div>
+      </div>
+      <div class="ai-body" id="findingsOutput">
+        <span style="color:var(--muted);font-family:var(--font-mono);font-size:12px">
+          // ستظهر هنا الثغرات المقترحة بعد تحليل الـ AI
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- shell -->
+
+<script>
+const TOOLS = [
+  { id:'subfinder', name:'subfinder', desc:'Passive subdomain enumeration', tag:'recon', github:'projectdiscovery/subfinder',
+    install:`go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest`,
+    cmd: t=>`subfinder -d ${t} -all -recursive -o subs.txt` },
+  { id:'httpx', name:'httpx', desc:'HTTP probing & tech detection', tag:'recon', github:'projectdiscovery/httpx',
+    install:`go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest`,
+    cmd: t=>`cat subs.txt | httpx -status-code -title -tech-detect -o live.txt` },
+  { id:'nuclei', name:'nuclei', desc:'Template-based vuln scanner', tag:'scan', github:'projectdiscovery/nuclei',
+    install:`go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && nuclei -update-templates`,
+    cmd: t=>`nuclei -l live.txt -t nuclei-templates/ -severity critical,high,medium -o findings.txt` },
+  { id:'amass', name:'amass', desc:'Advanced attack surface mapping', tag:'recon', github:'owasp-amass/amass',
+    install:`go install -v github.com/owasp-amass/amass/v4/...@master`,
+    cmd: t=>`amass enum -d ${t} -o amass_subs.txt` },
+  { id:'ffuf', name:'ffuf', desc:'Fast web fuzzer for dirs & params', tag:'fuzz', github:'ffuf/ffuf',
+    install:`go install github.com/ffuf/ffuf/v2@latest`,
+    cmd: t=>`ffuf -u https://${t}/FUZZ -w wordlist.txt -mc 200,301,302,403 -o dirs.json` },
+  { id:'katana', name:'katana', desc:'Fast crawler & endpoint discovery', tag:'recon', github:'projectdiscovery/katana',
+    install:`go install github.com/projectdiscovery/katana/cmd/katana@latest`,
+    cmd: t=>`katana -u https://${t} -ps -pss waybackarchive,commoncrawl,alienvault -o endpoints.txt` },
+  { id:'gau', name:'gau', desc:'Fetch known URLs from archives', tag:'recon', github:'lc/gau',
+    install:`go install github.com/lc/gau/v2/cmd/gau@latest`,
+    cmd: t=>`gau ${t} | tee gauUrls.txt` },
+  { id:'trufflehog', name:'TruffleHog', desc:'Find secrets & API keys in repos', tag:'secret', github:'trufflesecurity/trufflehog',
+    install:`go install github.com/trufflesecurity/trufflehog/v3@latest`,
+    cmd: t=>`trufflehog github --org=${t.split('.')[0]} --only-verified` },
+  { id:'linkfinder', name:'LinkFinder', desc:'Extract endpoints from JS files', tag:'recon', github:'GerbenJavado/LinkFinder',
+    install:`git clone https://github.com/GerbenJavado/LinkFinder.git && cd LinkFinder && pip3 install -r requirements.txt`,
+    cmd: t=>`python3 linkfinder.py -i https://${t} -o cli` },
+  { id:'gitleaks', name:'gitleaks', desc:'Scan git repos for secrets', tag:'secret', github:'gitleaks/gitleaks',
+    install:`go install github.com/gitleaks/gitleaks/v8@latest`,
+    cmd: t=>`gitleaks detect --source=. -v` },
+  { id:'eyewitness', name:'EyeWitness', desc:'Screenshot live hosts', tag:'recon', github:'RedSiege/EyeWitness',
+    install:`git clone https://github.com/RedSiege/EyeWitness.git && cd EyeWitness/Python && pip3 install -r requirements.txt`,
+    cmd: t=>`python3 EyeWitness.py -f live.txt --web` },
+  { id:'sqlmap', name:'sqlmap', desc:'Automatic SQL injection tool', tag:'scan', github:'sqlmapproject/sqlmap',
+    install:`git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git`,
+    cmd: t=>`python3 sqlmap.py -u "https://${t}/page?id=1" --dbs --batch` },
+  { id:'arjun', name:'Arjun', desc:'HTTP parameter discovery', tag:'fuzz', github:'s0md3v/Arjun',
+    install:`pip3 install arjun`,
+    cmd: t=>`arjun -u https://${t} --get --post -oJ params.json` },
+  { id:'dnsx', name:'dnsx', desc:'DNS toolkit for enumeration', tag:'recon', github:'projectdiscovery/dnsx',
+    install:`go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest`,
+    cmd: t=>`cat subs.txt | dnsx -a -cname -resp -o dns_resolved.txt` },
+  { id:'secretfinder', name:'SecretFinder', desc:'Find secrets in JS files', tag:'secret', github:'m4ll0k/SecretFinder',
+    install:`git clone https://github.com/m4ll0k/SecretFinder.git && pip3 install jsbeautifier lxml requests`,
+    cmd: t=>`python3 SecretFinder.py -i https://${t} -e` },
+  { id:'nmap', name:'nmap', desc:'Port scanner & service detection', tag:'scan', github:'nmap/nmap',
+    install:`sudo apt-get install -y nmap`,
+    cmd: t=>`nmap -sV -sC -p- --open -T4 ${t} -oN nmap.txt` },
+];
+
+let selected = new Set();
+
+function renderTools() {
+  const grid = document.getElementById('toolsGrid');
+  grid.innerHTML = TOOLS.map(t => `
+    <div class="tool-card" id="tc-${t.id}" onclick="toggle('${t.id}')">
+      <div class="tool-check" id="chk-${t.id}"></div>
+      <div class="tool-info">
+        <div class="tool-name">${t.name}</div>
+        <div class="tool-desc">${t.desc}</div>
+        <div>
+          <span class="tool-tag ${t.tag}">${t.tag}</span>
+          <a href="https://github.com/${t.github}" target="_blank" style="font-size:10px;color:var(--muted);text-decoration:none;margin-right:6px">github ↗</a>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function toggle(id) {
+  if (selected.has(id)) { selected.delete(id); document.getElementById('tc-'+id).classList.remove('selected'); document.getElementById('chk-'+id).textContent = ''; }
+  else { selected.add(id); document.getElementById('tc-'+id).classList.add('selected'); document.getElementById('chk-'+id).textContent = '✓'; }
+  updateBtns();
+}
+
+function selectAll() { TOOLS.forEach(t => { selected.add(t.id); document.getElementById('tc-'+t.id).classList.add('selected'); document.getElementById('chk-'+t.id).textContent = '✓'; }); updateBtns(); }
+function clearAll()  { TOOLS.forEach(t => { selected.delete(t.id); document.getElementById('tc-'+t.id).classList.remove('selected'); document.getElementById('chk-'+t.id).textContent = ''; }); updateBtns(); }
+
+function updateBtns() {
+  const has = selected.size > 0;
+  document.getElementById('installBtn').disabled = !has;
+  document.getElementById('analyzeBtn').disabled = !has || !document.getElementById('targetInput').value.trim();
+}
+
+document.getElementById('targetInput').addEventListener('input', updateBtns);
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['install','workflow','aiplan','findings'][i]===name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id==='tab-'+name));
+}
+
+function generateInstall() {
+  const tools = TOOLS.filter(t => selected.has(t.id));
+  const target = document.getElementById('targetInput').value.trim() || 'TARGET.com';
+
+  let install = `#!/bin/bash\n# BugHunter AI — Install Script\n# Generated: ${new Date().toISOString()}\n# Target: ${target}\n\n`;
+  install += `set -e\nexport GO111MODULE=on\nTARGET="${target}"\n\necho "[*] Installing tools..."\n\n`;
+  tools.forEach(t => { install += `# ${t.name} — github.com/${t.github}\n${t.install}\n\n`; });
+  install += `echo "[+] All tools installed!"\n`;
+
+  document.getElementById('installTerm').innerHTML = hlScript(install);
+  switchTab('install');
+
+  // Generate workflow
+  const wf = generateWorkflowScript(target, tools);
+  document.getElementById('workflowTerm').innerHTML = hlScript(wf);
+}
+
+function generateWorkflowScript(target, tools) {
+  let s = `#!/bin/bash\n# BugHunter AI — Auto Recon Workflow\n# Target: ${target}\n\nset -e\nTARGET="${target}"\nOUT="recon_${target.replace(/\./g,'_')}"\nmkdir -p $OUT\ncd $OUT\n\necho "\\n[*] Starting recon on $TARGET"\ndate\n\n`;
+
+  tools.forEach((t,i) => {
+    s += `# Step ${i+1}: ${t.name}\necho "\\n[${i+1}/${tools.length}] Running ${t.name}..."\n`;
+    s += t.cmd(target) + '\n';
+    s += `echo "[+] ${t.name} done"\n\n`;
+  });
+
+  s += `echo "\\n[✓] Recon complete! Results in $OUT/"\nls -lh\n`;
+  return s;
+}
+
+function hlScript(code) {
+  return code.replace(/^(#.*)/gm, '<span class="out">$1</span>')
+    .replace(/\b(echo|export|set|mkdir|cd|cat|ls|date)\b/g, '<span class="prompt">$1</span>')
+    .replace(/(\[.*?\])/g, '<span class="info">$1</span>')
+    .replace(/(\[✓.*?\])/g, '<span class="ok">$1</span>');
+}
+
+function copyTerminal(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.innerText).then(() => {
+    const btns = document.querySelectorAll('.copy-btn');
+    btns.forEach(b => { if(b.getAttribute('onclick').includes(id)) { b.textContent = 'copied!'; setTimeout(()=>b.textContent='copy',1500); } });
+  });
+}
+
+function startHunt() {
+  const t = document.getElementById('targetInput').value.trim();
+  if (!t) return;
+  document.getElementById('statsRow').style.display = 'flex';
+  document.getElementById('pipelineSection').style.display = 'block';
+  animatePipeline();
+  animateStats();
+}
+
+function animatePipeline() {
+  for (let i=0;i<8;i++) { const el = document.getElementById('p'+i); if(el){el.className='pipe-step';} }
+  let i=0;
+  const iv = setInterval(()=>{
+    if(i>0) { const prev=document.getElementById('p'+(i-1)); if(prev) { prev.className='pipe-step done'; } }
+    const cur=document.getElementById('p'+i);
+    if(cur) cur.className='pipe-step active';
+    const arrows=document.querySelectorAll('.pipe-arrow');
+    arrows.forEach((a,idx)=>{ a.className='pipe-arrow'+(idx===i-1?' active':''); });
+    i++;
+    if(i>8) clearInterval(iv);
+  },700);
+}
+
+function animateStats() {
+  const targets = [Math.floor(Math.random()*80+20), Math.floor(Math.random()*40+10), Math.floor(Math.random()*300+50), 0];
+  const ids = ['stat1','stat2','stat3','stat4'];
+  ids.forEach((id,i) => {
+    let cur=0, target=targets[i];
+    const iv = setInterval(()=>{
+      cur = Math.min(cur+Math.ceil(target/30), target);
+      document.getElementById(id).textContent = cur;
+      if(cur>=target) clearInterval(iv);
+    }, 40+i*20);
+  });
+}
+
+async function runAIAnalysis() {
+  const target = document.getElementById('targetInput').value.trim();
+  if (!target) return;
+  const type = document.getElementById('programType').value;
+  const tools = TOOLS.filter(t=>selected.has(t.id)).map(t=>t.name).join(', ');
+
+  switchTab('aiplan');
+  const out = document.getElementById('aiOutput');
+  out.innerHTML = `<div class="thinking"><span>●</span><span>●</span><span>●</span> <span style="color:var(--muted)">Claude AI يحلل الهدف ويبني خطة الاصطياد...</span></div>`;
+
+  const sample = await window.claude?.use('sample');
+  if (!sample) {
+    out.innerHTML = `<span style="color:var(--red)">// خطأ: تعذر الوصول لـ AI. جرب تفعيل الميزة.</span>`;
+    return;
+  }
+
+  const prompt = `You are an expert bug bounty hunter. Analyze this target and provide a detailed hunting plan.
+
+Target: ${target}
+Program Type: ${type}
+Available Tools: ${tools}
+
+Provide your response in Arabic (with technical terms in English) with these sections:
+1. **تحليل الهدف** — Attack surface analysis
+2. **أولويات الصيد** — What to hunt first (high ROI vulnerabilities)
+3. **خطة الاصطياد خطوة بخطوة** — Step-by-step plan with specific commands using the target domain
+4. **أكثر الثغرات احتمالاً** — Most likely vulns for this target type (list severity for each)
+5. **نقاط الفحص الحساسة** — Specific endpoints, params, headers to check
+
+Be specific and actionable. Include actual command examples using ${target}.`;
+
+  try {
+    let full = '';
+    await sample(prompt, {
+      onText: ({ text }) => {
+        full = text;
+        out.innerHTML = renderMD(text) + `<span class="thinking"><span>●</span><span>●</span><span>●</span></span>`;
+      }
+    });
+    out.innerHTML = renderMD(full);
+
+    // Now generate findings
+    generateFindings(target, type, sample);
+  } catch(e) {
+    out.innerHTML = `<span style="color:var(--red)">// خطأ: ${e.message}</span>`;
+  }
+}
+
+async function generateFindings(target, type, sample) {
+  const findingsOut = document.getElementById('findingsOutput');
+  findingsOut.innerHTML = `<div class="thinking"><span>●</span><span>●</span><span>●</span> <span style="color:var(--muted)">يبحث عن الثغرات المحتملة...</span></div>`;
+
+  const prompt = `You are a bug bounty hunter. Generate a list of 5-7 specific vulnerability findings to look for on: ${target} (${type} target).
+
+Respond ONLY with valid JSON array, no markdown, no explanation:
+[
+  {
+    "severity": "high|medium|low",
+    "title": "Vulnerability name",
+    "description": "Brief Arabic description of the finding",
+    "command": "specific command to test this"
+  }
+]`;
+
+  try {
+    const res = await sample(prompt);
+    let text = res.text.replace(/```json|```/g,'').trim();
+    const findings = JSON.parse(text);
+    const stat4 = document.getElementById('stat4');
+    if(stat4) stat4.textContent = findings.filter(f=>f.severity==='high').length;
+
+    findingsOut.innerHTML = `<div class="findings">${findings.map(f=>`
+      <div class="finding ${f.severity}">
+        <div class="finding-top">
+          <span class="sev-badge sev-${f.severity}">${f.severity.toUpperCase()}</span>
+          <span class="finding-title">${f.title}</span>
+        </div>
+        <div class="finding-desc">${f.description}</div>
+        <div class="finding-cmd">$ ${f.command}</div>
+      </div>`).join('')}</div>`;
+
+    switchTab('findings');
+  } catch(e) {
+    findingsOut.innerHTML = `<span style="color:var(--muted)">// لم يتم توليد الـ Findings تلقائياً — راجع خطة AI</span>`;
+  }
+}
+
+function renderMD(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h3>$1</h3>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n\n/g, '<br><br>');
+}
+
+renderTools();
+</script>
+</body>
+</html>
